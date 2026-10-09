@@ -36,8 +36,9 @@
 
   .apphead { display: flex; align-items: center; justify-content: space-between; }
   h1 { font-size: 20px; margin-bottom: 4px; }
-  .reload-btn { background: var(--chip); color: var(--accent); border: none; border-radius: 10px; width: 38px; height: 38px; font-size: 19px; cursor: pointer; flex-shrink: 0; }
-  .reload-btn:active { transform: scale(0.92); }
+  .reload-btn { display: grid; place-items: center; width: 40px; height: 40px; border: none; border-radius: 50%; background: var(--inner); color: var(--muted); cursor: pointer; flex-shrink: 0; transition: transform .45s cubic-bezier(.2,.8,.2,1), color .2s, background .2s; }
+  .reload-btn:hover { color: var(--accent); }
+  .reload-btn:active { transform: rotate(-180deg); color: var(--accent); background: var(--chip); }
   .lead { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
 
   .banner { background: linear-gradient(135deg, #e07a5f, #e0a35f); border-radius: 18px; color: #fff; padding: 16px 18px; margin-bottom: 20px; box-shadow: 0 10px 26px rgba(224,122,95,.25); } 
@@ -136,6 +137,9 @@
   .dot { width: 6px; height: 6px; border-radius: 50%; box-sizing: border-box; }
   .dot.ring { background: transparent !important; border: 1.5px solid; }
   .dot.faint { opacity: .4; }
+  .backup { display: flex; gap: 8px; }
+  .backup-btn { flex: 1; text-align: center; background: var(--chip); color: var(--text); border: none; border-radius: 12px; padding: 13px 14px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .backup-hint { font-size: 11px; color: var(--muted); margin: 8px 4px 0; }
   .cal-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 16px; font-size: 11px; color: var(--muted); }
   .cal-legend span { display: inline-flex; align-items: center; gap: 6px; }
   .lg { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-sizing: border-box; background: var(--muted); }
@@ -150,9 +154,14 @@
 <div class="wrap">
   <div class="apphead">
     <h1>そろそろ</h1>
-    <button id="reloadBtn" class="reload-btn" title="最新に更新">⟳</button>
+    <button id="reloadBtn" class="reload-btn" title="最新に更新" aria-label="最新に更新">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+        <path d="M21 3v6h-6"/>
+      </svg>
+    </button>
   </div>
-  <div class="lead">やるたびに記録すると、周期を自動で推測します</div>
+  <div class="lead">やるたびに記録すると、周期を自動で予測します</div>
 
   <div id="banner"></div>
 
@@ -161,7 +170,7 @@
     <input id="guess" class="num" type="number" min="1" max="999" placeholder="周期(任意)">
     <button id="addbtn">＋</button>
   </div>
-  <div class="hint">周期は分かれば日数で入れる。空でもOK。記録がたまると自動で上書き推測します</div>
+  <div class="hint">周期は分かれば日数で入れる。空でもOK。記録がたまると自動で上書き予測します</div>
 
   <div class="section-label">登録した習慣</div>
   <ul id="list"></ul>
@@ -188,6 +197,14 @@
       <span><i class="lg faint"></i>そろそろ</span>
     </div>
   </div>
+
+  <div class="section-label">バックアップ</div>
+  <div class="backup">
+    <button id="exportBtn" class="backup-btn">書き出し (保存)</button>
+    <label class="backup-btn" for="importFile">読み込み (復元)</label>
+    <input id="importFile" type="file" accept="application/json,.json" style="display:none">
+  </div>
+  <div class="backup-hint">記録をファイルに保存/復元できます。機種変更やバックアップに</div>
 </div>
 
 <div class="picker-overlay" id="picker" style="display:none">
@@ -210,12 +227,17 @@ const DAY = 86400000;
 
 const PALETTE = ["#5fa8a0","#6c8ebf","#d58a6b","#8aa888","#d6b36a","#c88a9a","#8f8fb3","#6fb3cf"];
 
-let state = JSON.parse(localStorage.getItem("cycle") || "null") || { tasks: [] };
-if (!Array.isArray(state.tasks)) state.tasks = [];
-state.tasks.forEach((t, i) => {
-  if (!Array.isArray(t.logs)) t.logs = [];
-  if (!t.color) t.color = PALETTE[i % PALETTE.length];
-});
+function normalize(s) {
+  if (!s || typeof s !== "object") s = {};
+  if (!Array.isArray(s.tasks)) s.tasks = [];
+  s.tasks.forEach((t, i) => {
+    if (!Array.isArray(t.logs)) t.logs = [];
+    if (!t.color) t.color = PALETTE[i % PALETTE.length];
+  });
+  return s;
+}
+
+let state = normalize(JSON.parse(localStorage.getItem("cycle") || "null"));
 
 // カレンダー表示月(保存しない)
 let viewY, viewM;
@@ -382,7 +404,7 @@ function makeLi(t, a) {
 function statusText(a) {
   if (a.status === "over") { const o = -a.daysLeft; return o === 0 ? "今日が目安" : o + "日すぎ"; }
   if (a.status === "soon" || a.status === "ok") return "あと" + a.daysLeft + "日";
-  if (a.status === "waiting") return "推測中";
+  if (a.status === "waiting") return "予測中";
   return "記録なし";
 }
 
@@ -391,11 +413,11 @@ function metaText(a) {
   const parts = [];
   parts.push("前回　<b>" + fmtDate(a.last) + "</b>");
   if (a.cycle !== null) {
-    if (a.estimated) parts.push("推測周期　<b>約" + a.cycle + "日</b>（" + a.samples + "回ぶんの記録から）");
-    else parts.push("設定周期　<b>" + a.cycle + "日</b>（記録がたまると自動推測）");
+    if (a.estimated) parts.push("予測周期　<b>約" + a.cycle + "日</b>（" + a.samples + "回ぶんの記録から）");
+    else parts.push("設定周期　<b>" + a.cycle + "日</b>（記録がたまると自動予測）");
     parts.push("次の目安　<b>" + fmtDate(a.nextDue) + "</b>");
   } else {
-    parts.push("周期　<b>推測中</b>（もう1回やると出ます）");
+    parts.push("周期　<b>予測中</b>（もう1回やると出ます）");
   }
   return parts.join("　／　");
 }
@@ -705,6 +727,43 @@ document.getElementById("selYear").onchange = (e) => { viewY = parseInt(e.target
 document.getElementById("selMonth").onchange = (e) => { viewM = parseInt(e.target.value, 10); renderCalendar(); };
 document.getElementById("todayBtn").onclick = () => { const d = new Date(); viewY = d.getFullYear(); viewM = d.getMonth(); renderCalendar(); };
 document.getElementById("reloadBtn").onclick = () => location.reload();
+
+// ===== バックアップ(書き出し/読み込み) =====
+function exportData() {
+  const data = JSON.stringify(state, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  const name = "sorosoro-backup-" + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + ".json";
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast("書き出しました");
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let obj;
+    try { obj = JSON.parse(reader.result); }
+    catch (e) { showToast("読み込めませんでした (ファイル形式)"); return; }
+    if (!obj || !Array.isArray(obj.tasks)) { showToast("バックアップではないようです"); return; }
+    if (!confirm("今の記録を、読み込んだ内容で置き換えます。よろしいですか？")) return;
+    state = normalize(obj);
+    save(); render();
+    showToast("読み込みました ✅");
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById("exportBtn").onclick = exportData;
+document.getElementById("importFile").onchange = (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (f) importData(f);
+  e.target.value = ""; // 同じファイルを続けて選べるように
+};
 
 document.getElementById("pprev").onclick = () => { pM--; if (pM < 0) { pM = 11; pY--; } renderPicker(); };
 document.getElementById("pnext").onclick = () => { pM++; if (pM > 11) { pM = 0; pY++; } renderPicker(); };
