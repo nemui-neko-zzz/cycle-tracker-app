@@ -65,7 +65,10 @@
 
   .row1 { display: flex; align-items: center; gap: 9px; }
   .cdot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
-  .name { font-size: 17px; font-weight: 700; flex: 1; word-break: break-word; }
+  .namewrap { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+  .name { font-size: 17px; font-weight: 700; word-break: break-word; }
+  .edit-btn { background: none; border: none; color: var(--muted); cursor: pointer; padding: 2px; display: grid; place-items: center; flex-shrink: 0; }
+  .edit-btn:active { transform: scale(0.9); color: var(--accent); }
   .del-top { background: none; border: none; color: var(--muted); font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 2px 2px 6px; flex-shrink: 0; }
   .status { font-size: 13px; font-weight: 700; white-space: nowrap; }
   .status.over { color: var(--over); }
@@ -347,9 +350,16 @@ function makeLi(t, a) {
   row1.className = "row1";
   const cdot = document.createElement("i");
   cdot.className = "cdot"; cdot.style.background = t.color;
+  const nameWrap = document.createElement("div");
+  nameWrap.className = "namewrap";
   const name = document.createElement("div");
   name.className = "name"; name.textContent = t.name;
-  row1.append(cdot, name);
+  const edit = document.createElement("button");
+  edit.className = "edit-btn"; edit.title = "名前を変更"; edit.setAttribute("aria-label", "名前を変更");
+  edit.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  edit.onclick = (e) => { e.stopPropagation(); renameTask(t.id); };
+  nameWrap.append(name, edit);
+  row1.append(cdot, nameWrap);
   // カウントダウン(あと◯日/◯日すぎ)のときだけ右に表示
   if (a.status === "over" || a.status === "soon" || a.status === "ok") {
     const st = document.createElement("div");
@@ -701,6 +711,18 @@ function openDayMenu(dayMs, entries) {
   ov.appendChild(box);
   ov.onclick = (e) => { if (e.target === ov) close(); };
   document.body.appendChild(ov);
+}
+
+function renameTask(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return;
+  const v = prompt("習慣の名前を変更", t.name);
+  if (v === null) return; // キャンセル
+  const name = v.trim();
+  if (!name) { showToast("名前が空です"); return; }
+  t.name = name;
+  save(); render();
+  showToast("名前を変えました");
 }
 
 function removeTask(id, name) {
