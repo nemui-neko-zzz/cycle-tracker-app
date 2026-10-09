@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="そろそろ">
+<meta name="theme-color" content="#eef1f6">
+<title>そろそろ</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #eef1f6;        /* 明るいオフホワイト(わずかに青み) */
+    --card: #ffffff;
+    --inner: #e7ebf2;
+    --chip: #e1e6ef;
+    --accent: #4360cc;    /* 群青(ウルトラマリン) */
+    --accentText: #ffffff;
+    --disabled: #c3cad8;
+    --text: #1f2940;      /* 濃紺の文字 */
+    --muted: #76829a;
+    --over: #cf6244;      /* テラコッタ */
+    --soon: #c08a1e;      /* マスタード */
+    --ok: #5e79c0;        /* スレートブルー */
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); overflow-x: hidden;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 20px 16px 120px; }
+
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .lead { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+
+  .banner { background: linear-gradient(135deg, #e07a5f, #e0a35f); border-radius: 18px; color: #fff; padding: 16px 18px; margin-bottom: 20px; box-shadow: 0 10px 26px rgba(224,122,95,.25); } 
+  .banner .ttl { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .banner .list { font-size: 14px; line-height: 1.7; }
+  .banner.calm { background: linear-gradient(135deg, #4c6bd0, #5a8fc0); box-shadow: 0 10px 26px rgba(76,107,208,.28); }
+
+  .add { display: flex; gap: 8px; margin-bottom: 6px; }
+  .add input.text { flex: 1; background: var(--card); border: none; border-radius: 14px; padding: 15px 16px; color: var(--text); font-size: 16px; min-width: 0; }
+  .add input.num { width: 86px; flex-shrink: 0; background: var(--card); border: none; border-radius: 14px; padding: 15px 8px; color: var(--text); font-size: 15px; text-align: center; }
+  .add input::placeholder { color: var(--muted); }
+  .add button { background: var(--accent); border: none; border-radius: 14px; color: var(--accentText); font-size: 24px; font-weight: 800; width: 54px; flex-shrink: 0; cursor: pointer; transition: transform .1s; }
+  .add button:active { transform: scale(0.92); }
+  .hint { font-size: 11px; color: var(--muted); margin: 0 4px 16px; }
+
+  .section-label { font-size: 12px; color: var(--muted); margin: 22px 4px 10px; letter-spacing: 1px; }
+
+  ul { list-style: none; }
+  li { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 12px; animation: pop .35s cubic-bezier(.2,.8,.2,1); border-left: 4px solid var(--ok); }
+  @keyframes pop { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  li.over { border-left-color: var(--over); }
+  li.soon { border-left-color: var(--soon); }
+  li.sel { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  .row1 { display: flex; align-items: center; gap: 9px; }
+  .cdot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .name { font-size: 17px; font-weight: 700; flex: 1; word-break: break-word; }
+  .del-top { background: none; border: none; color: var(--muted); font-size: 17px; line-height: 1; cursor: pointer; padding: 2px 2px 2px 6px; flex-shrink: 0; }
+  .status { font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .status.over { color: var(--over); }
+  .status.soon { color: var(--soon); }
+  .status.ok { color: var(--muted); }
+
+  .meta { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.7; }
+  .meta b { color: var(--text); font-weight: 700; }
+
+  .track { height: 6px; background: var(--inner); border-radius: 6px; margin-top: 10px; overflow: hidden; }
+  .track > i { display: block; height: 100%; border-radius: 6px; transition: width .5s cubic-bezier(.2,.8,.2,1); }
+
+  .actions { display: flex; gap: 8px; margin-top: 14px; }
+  .btn { border: none; border-radius: 12px; padding: 11px 14px; font-size: 14px; font-weight: 700; cursor: pointer; transition: transform .1s; }
+  .btn:active { transform: scale(0.95); }
+  .btn.did { background: var(--accent); color: var(--accentText); flex: 1; }
+  .btn.undo, .btn.del { background: var(--chip); color: var(--muted); }
+
+  .addlog { display: flex; gap: 8px; margin-top: 10px; }
+  .addlog button { flex: 1; background: var(--chip); color: var(--text); border: none; border-radius: 12px; padding: 11px 14px; font-size: 14px; font-weight: 700; cursor: pointer; }
+
+  /* 日付ピッカー(ミニカレンダー) */
+  .picker-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: flex-start; justify-content: center; z-index: 100; padding: 12vh 20px 20px; overflow-y: auto; }
+  .picker { background: var(--card); border-radius: 18px; padding: 18px; width: 100%; max-width: 340px; }
+  .picker-title { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  .picker-title b { color: var(--text); font-size: 15px; }
+  .picker-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .picker-head .mt { font-size: 15px; font-weight: 700; }
+  .picker-head button { background: var(--inner); color: var(--text); border: none; border-radius: 10px; width: 34px; height: 34px; font-size: 18px; cursor: pointer; }
+  .pgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .pdow { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 4px; }
+  .pdow.sun { color: #c0607a; } .pdow.sat { color: #4f7fbf; }
+  .pcell { aspect-ratio: 1; display: grid; place-items: center; border-radius: 9px; font-size: 14px; cursor: pointer; background: var(--inner); color: var(--text); }
+  .pcell.blank { background: transparent; cursor: default; }
+  .pcell.disabled { color: var(--disabled); background: transparent; cursor: default; }
+  .pcell.logged { background: var(--accent); color: var(--accentText); font-weight: 800; }
+  .pcell.today { box-shadow: inset 0 0 0 2px var(--accent); }
+  .picker-close { margin-top: 14px; width: 100%; background: var(--chip); color: var(--text); border: none; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .daymenu-row { display: flex; align-items: center; gap: 10px; background: var(--inner); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+  .daymenu-row .cdot { width: 13px; height: 13px; box-sizing: border-box; }
+  .dminfo { flex: 1; }
+  .dminfo .nm { font-size: 15px; font-weight: 700; color: var(--text); }
+  .dminfo .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .daymenu-row .rm { background: var(--chip); color: var(--over); border: none; border-radius: 9px; padding: 8px 13px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+  .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 15px; line-height: 1.9; }
+
+  /* カレンダー */
+  .calbox { background: var(--card); border-radius: 18px; padding: 16px; margin-top: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-size: 13px; font-weight: 700; background: var(--inner); border: none; border-radius: 20px; padding: 7px 12px; cursor: pointer; }
+  .chip i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .chip.off { opacity: .4; text-decoration: line-through; }
+  .chips-hint { font-size: 11px; color: var(--muted); margin: 0 4px 14px; }
+  .cal-tools { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+  .today-btn { background: var(--chip); color: var(--accent); border: none; border-radius: 10px; padding: 8px 13px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  .cal-head > button { background: var(--inner); color: var(--text); border: none; border-radius: 10px; width: 36px; height: 36px; font-size: 18px; cursor: pointer; flex-shrink: 0; }
+  .cal-sel { display: flex; gap: 8px; }
+  .cal-sel select { background: var(--inner); color: var(--text); border: none; border-radius: 10px; padding: 8px 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .dow { text-align: center; font-size: 11px; color: var(--muted); padding-bottom: 4px; }
+  .dow.sun { color: #c0607a; }
+  .dow.sat { color: #4f7fbf; }
+  .cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; padding-top: 5px; border-radius: 10px; font-size: 13px; color: var(--text); position: relative; }
+  .cell.blank { background: transparent; }
+  .cell.today { box-shadow: inset 0 0 0 2px var(--accent); }
+  .dots { position: absolute; bottom: 4px; left: 2px; right: 2px; display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; box-sizing: border-box; }
+  .dot.ring { background: transparent !important; border: 1.5px solid; }
+  .dot.faint { opacity: .4; }
+  .cal-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 16px; font-size: 11px; color: var(--muted); }
+  .cal-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .lg { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-sizing: border-box; background: var(--muted); }
+  .lg.ring { background: transparent; border: 1.5px solid var(--muted); }
+  .lg.faint { opacity: .4; }
+
+  .toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%) translateY(100px); background: var(--text); color: #fff; padding: 14px 24px; border-radius: 30px; font-weight: 700; font-size: 15px; box-shadow: 0 8px 24px rgba(0,0,0,.3); opacity: 0; transition: all .4s cubic-bezier(.2,.8,.2,1); z-index: 50; pointer-events: none; }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>そろそろ</h1>
+  <div class="lead">やるたびに記録すると、周期を自動で推測します</div>
+
+  <div id="banner"></div>
+
+  <div class="add">
+    <input id="input" class="text" type="text" placeholder="例 爪切り / 美容院" maxlength="40" enterkeyhint="done">
+    <input id="guess" class="num" type="number" min="1" max="999" placeholder="周期(任意)">
+    <button id="addbtn">＋</button>
+  </div>
+  <div class="hint">周期は分かれば日数で入れる。空でもOK。記録がたまると自動で上書き推測します</div>
+
+  <div class="section-label">登録した習慣</div>
+  <ul id="list"></ul>
+
+  <div class="section-label" id="calLabel" style="display:none">カレンダー</div>
+  <div class="calbox" id="calbox" style="display:none">
+    <div class="chips" id="chips"></div>
+    <div class="chips-hint">習慣名をタップで表示/非表示を切り替え</div>
+    <div class="cal-tools">
+      <button id="todayBtn" class="today-btn">今日に戻る</button>
+    </div>
+    <div class="cal-head">
+      <button id="prev">‹</button>
+      <div class="cal-sel">
+        <select id="selYear"></select>
+        <select id="selMonth"></select>
+      </div>
+      <button id="next">›</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-legend">
+      <span><i class="lg"></i>やった日</span>
+      <span><i class="lg ring"></i>次の目安</span>
+      <span><i class="lg faint"></i>そろそろ</span>
+    </div>
+  </div>
+</div>
+
+<div class="picker-overlay" id="picker" style="display:none">
+  <div class="picker">
+    <div class="picker-title" id="pickerTitle"></div>
+    <div class="picker-head">
+      <button id="pprev">‹</button>
+      <div class="mt" id="pickerMonth"></div>
+      <button id="pnext">›</button>
+    </div>
+    <div class="pgrid" id="pickerGrid"></div>
+    <button class="picker-close" id="pickerClose">閉じる</button>
+  </div>
+</div>
+
+<div class="toast" id="toast">記録しました</div>
+
+<script>
+const DAY = 86400000;
+
+const PALETTE = ["#5fa8a0","#6c8ebf","#d58a6b","#8aa888","#d6b36a","#c88a9a","#8f8fb3","#6fb3cf"];
+
+let state = JSON.parse(localStorage.getItem("cycle") || "null") || { tasks: [] };
+if (!Array.isArray(state.tasks)) state.tasks = [];
+state.tasks.forEach((t, i) => {
+  if (!Array.isArray(t.logs)) t.logs = [];
+  if (!t.color) t.color = PALETTE[i % PALETTE.length];
+});
+
+// カレンダー表示月(保存しない)
+let viewY, viewM;
+let hiddenIds = new Set(); // カレンダーで非表示にしている習慣
+(function(){ const d = new Date(); viewY = d.getFullYear(); viewM = d.getMonth(); })();
+
+function save() { localStorage.setItem("cycle", JSON.stringify(state)); }
+function startOfDay(ms) { const d = new Date(ms); d.setHours(0,0,0,0); return d.getTime(); }
+function todayMs() { return startOfDay(Date.now()); }
+function fmtDate(ms) { const d = new Date(ms); return (d.getMonth()+1) + "/" + d.getDate(); }
+function todayStr() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+
+function analyze(t) {
+  const logs = t.logs.slice().sort((a,b) => a - b);
+  const n = logs.length;
+  const last = n ? logs[n-1] : null;
+  let cycle = null, samples = 0, estimated = false, recent = null;
+  if (n >= 2) {
+    const diffs = [];
+    for (let i = 1; i < n; i++) diffs.push((startOfDay(logs[i]) - startOfDay(logs[i-1])) / DAY);
+    recent = diffs.slice(-4);
+    cycle = Math.round(recent.reduce((a,b)=>a+b,0) / recent.length);
+    samples = diffs.length; estimated = true;
+  } else if (t.guess) { cycle = t.guess; }
+  if (cycle !== null && cycle < 1) cycle = 1;
+
+  // 「そろそろ」期間: 記録のばらつき(標準偏差)が小さいほど短くする
+  let soonWindow = 0;
+  if (cycle !== null) {
+    if (recent && recent.length >= 2) {
+      const mean = recent.reduce((a,b)=>a+b,0) / recent.length;
+      const variance = recent.reduce((s,x)=>s+(x-mean)*(x-mean),0) / recent.length;
+      const sd = Math.sqrt(variance);
+      soonWindow = Math.round(sd);                 // ばらつき連動
+    } else {
+      soonWindow = Math.round(cycle * 0.15);        // 情報が少ないときの仮
+    }
+    // 長くなりすぎないよう、上限は14日(かつ周期の半分)まで
+    soonWindow = Math.max(1, Math.min(soonWindow, 14, Math.floor(cycle / 2)));
+  }
+
+  let nextDue = null, daysLeft = null, status = "new";
+  if (last !== null && cycle !== null) {
+    nextDue = startOfDay(last) + cycle * DAY;
+    daysLeft = Math.round((nextDue - todayMs()) / DAY);
+    if (daysLeft <= 0) status = "over";
+    else if (daysLeft <= soonWindow) status = "soon";
+    else status = "ok";
+  } else if (last !== null) { status = "waiting"; }
+  return { logs, n, last, cycle, samples, estimated, nextDue, daysLeft, status, soonWindow };
+}
+
+function render() {
+  const listEl = document.getElementById("list");
+  listEl.innerHTML = "";
+
+  if (state.tasks.length === 0) {
+    listEl.innerHTML = '<div class="empty">まだ習慣がありません🌱<br>「爪切り」などを登録して<br>やった日に「今日やった」を押そう</div>';
+    renderBanner([]);
+    document.getElementById("calLabel").style.display = "none";
+    document.getElementById("calbox").style.display = "none";
+    return;
+  }
+
+  const items = state.tasks.map(t => ({ t, a: analyze(t) }));
+  const rank = { over: 0, soon: 1, waiting: 2, ok: 3, new: 4 };
+  items.sort((x, y) => {
+    const r = rank[x.a.status] - rank[y.a.status];
+    if (r !== 0) return r;
+    if (x.a.daysLeft !== null && y.a.daysLeft !== null) return x.a.daysLeft - y.a.daysLeft;
+    return 0;
+  });
+
+  items.forEach(({ t, a }) => listEl.appendChild(makeLi(t, a)));
+  renderBanner(items.filter(i => i.a.status === "over" || i.a.status === "soon"));
+
+  document.getElementById("calLabel").style.display = "block";
+  document.getElementById("calbox").style.display = "block";
+  renderLegend();
+  renderCalendar();
+}
+
+function renderBanner(dueItems) {
+  const el = document.getElementById("banner");
+  if (dueItems.length === 0) {
+    if (state.tasks.length === 0) { el.innerHTML = ""; el.className = ""; return; }
+    el.className = "banner calm";
+    el.innerHTML = '<div class="ttl">いまは落ち着いています☕️</div><div class="list">そろそろの習慣はありません</div>';
+    return;
+  }
+  el.className = "banner";
+  const lines = dueItems.map(({ t, a }) => {
+    if (a.status === "over") { const o = -a.daysLeft; return "・<b>" + esc(t.name) + "</b>　" + (o === 0 ? "今日が目安" : o + "日すぎ"); }
+    return "・<b>" + esc(t.name) + "</b>　あと" + a.daysLeft + "日";
+  }).join("<br>");
+  el.innerHTML = '<div class="ttl">そろそろですよ 👀</div><div class="list">' + lines + '</div>';
+}
+
+function esc(s) { return s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+function makeLi(t, a) {
+  const li = document.createElement("li");
+  if (a.status === "over") li.classList.add("over");
+  else if (a.status === "soon") li.classList.add("soon");
+
+  const row1 = document.createElement("div");
+  row1.className = "row1";
+  const cdot = document.createElement("i");
+  cdot.className = "cdot"; cdot.style.background = t.color;
+  const name = document.createElement("div");
+  name.className = "name"; name.textContent = t.name;
+  row1.append(cdot, name);
+  // カウントダウン(あと◯日/◯日すぎ)のときだけ右に表示
+  if (a.status === "over" || a.status === "soon" || a.status === "ok") {
+    const st = document.createElement("div");
+    st.className = "status " + a.status;
+    st.textContent = statusText(a);
+    row1.append(st);
+  }
+  // 削除は右上
+  const del = document.createElement("button");
+  del.className = "del-top"; del.textContent = "✕"; del.title = "この習慣を削除";
+  del.onclick = (e) => { e.stopPropagation(); removeTask(t.id, t.name); };
+  row1.append(del);
+  li.appendChild(row1);
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.innerHTML = metaText(a);
+  li.appendChild(meta);
+
+  if (a.last !== null && a.cycle !== null) {
+    const elapsed = (todayMs() - startOfDay(a.last)) / DAY;
+    const ratio = Math.min(1.2, elapsed / a.cycle);
+    const track = document.createElement("div");
+    track.className = "track";
+    const i = document.createElement("i");
+    i.style.width = Math.min(100, ratio * 100) + "%";
+    i.style.background = a.status === "over" ? "var(--over)" : a.status === "soon" ? "var(--soon)" : "var(--ok)";
+    track.appendChild(i);
+    li.appendChild(track);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  const did = document.createElement("button");
+  did.className = "btn did"; did.textContent = "記録する";
+  did.onclick = (e) => { e.stopPropagation(); logToday(t.id); };
+  actions.appendChild(did);
+  li.appendChild(actions);
+
+  // 過去にやった日を追加する(ミニカレンダーを開く)
+  const addlog = document.createElement("div");
+  addlog.className = "addlog";
+  const dateBtn = document.createElement("button");
+  dateBtn.textContent = "📅 過去の記録を追加";
+  dateBtn.onclick = (e) => { e.stopPropagation(); openPicker(t.id); };
+  addlog.appendChild(dateBtn);
+  li.appendChild(addlog);
+
+  return li;
+}
+
+function statusText(a) {
+  if (a.status === "over") { const o = -a.daysLeft; return o === 0 ? "今日が目安" : o + "日すぎ"; }
+  if (a.status === "soon" || a.status === "ok") return "あと" + a.daysLeft + "日";
+  if (a.status === "waiting") return "推測中";
+  return "記録なし";
+}
+
+function metaText(a) {
+  if (a.n === 0) return "まだ記録がありません。やった日に下のボタンを押してください";
+  const parts = [];
+  parts.push("前回　<b>" + fmtDate(a.last) + "</b>");
+  if (a.cycle !== null) {
+    if (a.estimated) parts.push("推測周期　<b>約" + a.cycle + "日</b>（" + a.samples + "回ぶんの記録から）");
+    else parts.push("設定周期　<b>" + a.cycle + "日</b>（記録がたまると自動推測）");
+    parts.push("次の目安　<b>" + fmtDate(a.nextDue) + "</b>");
+  } else {
+    parts.push("周期　<b>推測中</b>（もう1回やると出ます）");
+  }
+  return parts.join("　／　");
+}
+
+/* ===== カレンダー(全習慣を色分けで重ねて表示) ===== */
+function renderLegend() {
+  const el = document.getElementById("chips");
+  el.innerHTML = "";
+  state.tasks.forEach(t => {
+    const s = document.createElement("button");
+    s.className = "chip" + (hiddenIds.has(t.id) ? " off" : "");
+    const dot = document.createElement("i");
+    dot.style.background = t.color;
+    const name = document.createElement("span");
+    name.textContent = t.name;
+    s.append(dot, name);
+    s.onclick = () => {
+      if (hiddenIds.has(t.id)) hiddenIds.delete(t.id);
+      else hiddenIds.add(t.id);
+      renderLegend();
+      renderCalendar();
+    };
+    el.appendChild(s);
+  });
+}
+
+// あるタスクが、ある日(startOfDay)にどんな印かを返す: "logged" | "pred" | "soon" | null
+function markFor(t, a, d) {
+  if (a.last === null) return null;
+  if (t.logs.some(l => startOfDay(l) === d)) return "logged";
+  if (!a.cycle) return null;
+  const today = todayMs();
+  const dueDays = Math.round((startOfDay(a.nextDue) - today) / DAY); // >0:まだ先 0:今日 <0:過ぎた
+  const diff = Math.round((d - startOfDay(a.last)) / DAY);
+
+  if (dueDays < 0) {
+    // 予測日を過ぎた: 今日から3日ぶんを そろそろ(毎日スライド)。今日より前にはつけない
+    const fromToday = Math.round((d - today) / DAY);
+    if (fromToday >= 0 && fromToday <= 2) return "soon";
+    if (fromToday < 0) return null;
+    // 今日より先: 次の周期以降の予測日とその手前
+    if (diff % a.cycle === 0) return "pred";
+    const toNext = a.cycle - (diff % a.cycle);
+    if (toNext <= a.soonWindow) return "soon";
+    return null;
+  }
+
+  // 予測日まで(まだ過ぎていない): 予測日と、その手前の そろそろ
+  if (diff <= 0) return null;
+  if (diff % a.cycle === 0) return "pred";
+  const toNext = a.cycle - (diff % a.cycle);
+  if (toNext <= a.soonWindow) return "soon";
+  return null;
+}
+
+function renderCalendar() {
+  populateSelectors();
+
+  const grid = document.getElementById("calGrid");
+  grid.innerHTML = "";
+  const dows = ["日","月","火","水","木","金","土"];
+  dows.forEach((d, i) => {
+    const h = document.createElement("div");
+    h.className = "dow" + (i === 0 ? " sun" : i === 6 ? " sat" : "");
+    h.textContent = d; grid.appendChild(h);
+  });
+
+  const firstDow = new Date(viewY, viewM, 1).getDay();
+  const daysInMonth = new Date(viewY, viewM + 1, 0).getDate();
+  const today = todayMs();
+
+  // 各タスクを一度だけ分析しておく
+  const anas = state.tasks.filter(t => !hiddenIds.has(t.id)).map(t => ({ t, a: analyze(t) }));
+
+  for (let i = 0; i < firstDow; i++) {
+    const c = document.createElement("div"); c.className = "cell blank"; grid.appendChild(c);
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = startOfDay(new Date(viewY, viewM, day).getTime());
+    const cell = document.createElement("div");
+    cell.className = "cell" + (d === today ? " today" : "");
+    const num = document.createElement("div");
+    num.textContent = day; cell.appendChild(num);
+
+    const dots = document.createElement("div");
+    dots.className = "dots";
+    const entries = []; // { t, mark } その日に関係する習慣
+    anas.forEach(({ t, a }) => {
+      const m = markFor(t, a, d);
+      if (!m) return;
+      entries.push({ t, mark: m });
+      const dot = document.createElement("i");
+      dot.className = "dot" + (m === "pred" ? " ring" : m === "soon" ? " faint" : "");
+      if (m === "pred") dot.style.borderColor = t.color;
+      else dot.style.background = t.color;
+      dots.appendChild(dot);
+    });
+    if (dots.children.length) cell.appendChild(dots);
+    // 印のある日はタップで詳細(記録済み/予測/そろそろ)を開く
+    if (entries.length) {
+      cell.style.cursor = "pointer";
+      cell.onclick = () => openDayMenu(d, entries);
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function populateSelectors() {
+  const baseY = new Date().getFullYear();
+  let minY = Math.min(baseY - 3, viewY);
+  let maxY = Math.max(baseY + 3, viewY);
+  const selYear = document.getElementById("selYear");
+  const selMonth = document.getElementById("selMonth");
+  let yopts = "";
+  for (let y = minY; y <= maxY; y++) yopts += '<option value="' + y + '">' + y + '年</option>';
+  selYear.innerHTML = yopts;
+  let mopts = "";
+  for (let m = 0; m < 12; m++) mopts += '<option value="' + m + '">' + (m + 1) + '月</option>';
+  selMonth.innerHTML = mopts;
+  selYear.value = viewY;
+  selMonth.value = viewM;
+}
+
+/* ===== 日付ピッカー(ミニカレンダー) ===== */
+let pickerTaskId = null, pY, pM;
+
+function openPicker(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return;
+  pickerTaskId = id;
+  // 直近の記録がある月、なければ今月から始める
+  const base = t.logs.length ? new Date(Math.max(...t.logs)) : new Date();
+  pY = base.getFullYear(); pM = base.getMonth();
+  document.getElementById("pickerTitle").innerHTML = "<b>" + esc(t.name) + "</b> をやった日を選ぶ";
+  document.getElementById("picker").style.display = "grid";
+  renderPicker();
+}
+
+function closePicker() {
+  document.getElementById("picker").style.display = "none";
+  pickerTaskId = null;
+}
+
+function renderPicker() {
+  const t = state.tasks.find(x => x.id === pickerTaskId);
+  if (!t) return;
+  document.getElementById("pickerMonth").textContent = pY + "年" + (pM + 1) + "月";
+  const grid = document.getElementById("pickerGrid");
+  grid.innerHTML = "";
+  const dows = ["日","月","火","水","木","金","土"];
+  dows.forEach((d, i) => {
+    const h = document.createElement("div");
+    h.className = "pdow" + (i === 0 ? " sun" : i === 6 ? " sat" : "");
+    h.textContent = d; grid.appendChild(h);
+  });
+
+  const firstDow = new Date(pY, pM, 1).getDay();
+  const daysInMonth = new Date(pY, pM + 1, 0).getDate();
+  const today = todayMs();
+  const loggedSet = new Set(t.logs.map(l => startOfDay(l)));
+
+  for (let i = 0; i < firstDow; i++) {
+    const c = document.createElement("div"); c.className = "pcell blank"; grid.appendChild(c);
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = startOfDay(new Date(pY, pM, day).getTime());
+    const cell = document.createElement("div");
+    cell.className = "pcell";
+    cell.textContent = day;
+    if (d === today) cell.classList.add("today");
+    if (loggedSet.has(d)) {
+      cell.classList.add("logged");
+    } else if (d > today) {
+      cell.classList.add("disabled");
+    } else {
+      cell.onclick = () => {
+        const ds = pY + "-" + String(pM + 1).padStart(2,"0") + "-" + String(day).padStart(2,"0");
+        logAtDate(pickerTaskId, ds);
+        renderPicker();
+      };
+    }
+    grid.appendChild(cell);
+  }
+}
+
+/* ===== 操作 ===== */
+function addTask() {
+  const input = document.getElementById("input");
+  const guessEl = document.getElementById("guess");
+  const name = input.value.trim();
+  if (!name) return;
+  let guess = parseInt(guessEl.value, 10);
+  if (!guess || guess < 1) guess = null;
+  const id = Date.now();
+  const color = PALETTE[state.tasks.length % PALETTE.length];
+  state.tasks.push({ id, name, guess, logs: [], color });
+  input.value = ""; guessEl.value = "";
+  save(); render();
+}
+
+function logToday(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return;
+  const today = todayMs();
+  if (t.logs.some(l => startOfDay(l) === today)) { showToast("今日はもう記録済みです"); return; }
+  t.logs.push(Date.now());
+  save(); render();
+  showToast("記録しました ✅");
+  if (navigator.vibrate) navigator.vibrate(25);
+}
+
+function logAtDate(id, dateStr) {
+  if (!dateStr) { showToast("日付を選んでください"); return; }
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return;
+  const [y, mo, da] = dateStr.split("-").map(Number);
+  const stamp = new Date(y, mo - 1, da, 12, 0, 0).getTime();
+  if (startOfDay(stamp) > todayMs()) { showToast("未来の日は記録できません"); return; }
+  if (t.logs.some(l => startOfDay(l) === startOfDay(stamp))) { showToast("その日はもう記録済みです"); return; }
+  t.logs.push(stamp);
+  // 入れた日の月をカレンダーに表示
+  viewY = y; viewM = mo - 1;
+  save(); render();
+  showToast(fmtDate(stamp) + " を記録しました ✅");
+}
+
+function removeLog(id, dayMs) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return false;
+  const before = t.logs.length;
+  t.logs = t.logs.filter(l => startOfDay(l) !== dayMs);
+  if (t.logs.length !== before) { save(); return true; }
+  return false;
+}
+
+// 下のカレンダーで印のある日をタップしたとき: その日の内容を表示する
+// entries: [{ t, mark: "logged"|"pred"|"soon" }]
+function openDayMenu(dayMs, entries) {
+  const ov = document.createElement("div");
+  ov.className = "picker-overlay";
+  const box = document.createElement("div");
+  box.className = "picker";
+  const close = () => document.body.removeChild(ov);
+
+  const title = document.createElement("div");
+  title.className = "picker-title";
+  title.innerHTML = "<b>" + fmtDate(dayMs) + "</b> の予定";
+  box.appendChild(title);
+
+  entries.forEach(({ t, mark }) => {
+    const row = document.createElement("div");
+    row.className = "daymenu-row";
+    // 印のマーカー
+    const dot = document.createElement("i");
+    dot.className = "cdot";
+    if (mark === "pred") { dot.style.background = "transparent"; dot.style.border = "2px solid " + t.color; }
+    else { dot.style.background = t.color; if (mark === "soon") dot.style.opacity = ".45"; }
+    // 名前とラベル
+    const info = document.createElement("div");
+    info.className = "dminfo";
+    const label = mark === "logged" ? "記録済み" : mark === "pred" ? "予測された日" : "そろそろ";
+    info.innerHTML = "<div class='nm'>" + esc(t.name) + "</div><div class='sub'>" + label + "</div>";
+    row.append(dot, info);
+    // 記録済みは取消ボタン
+    if (mark === "logged") {
+      const rm = document.createElement("button");
+      rm.className = "rm"; rm.textContent = "取消";
+      rm.onclick = () => {
+        if (removeLog(t.id, dayMs)) { showToast(fmtDate(dayMs) + " の " + t.name + " を取り消しました"); render(); }
+        close();
+      };
+      row.appendChild(rm);
+    }
+    box.appendChild(row);
+  });
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "picker-close"; closeBtn.textContent = "閉じる";
+  closeBtn.onclick = close;
+  box.appendChild(closeBtn);
+  ov.appendChild(box);
+  ov.onclick = (e) => { if (e.target === ov) close(); };
+  document.body.appendChild(ov);
+}
+
+function removeTask(id, name) {
+  if (!confirm("「" + name + "」を記録ごと削除しますか？")) return;
+  state.tasks = state.tasks.filter(x => x.id !== id);
+  save(); render();
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const toast = document.getElementById("toast");
+  toast.textContent = msg; toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 1500);
+}
+
+document.getElementById("addbtn").onclick = addTask;
+// Enterでは作らない(＋ボタンのみ)。Enterの既定動作だけ止める
+document.getElementById("input").addEventListener("keydown", e => { if (e.key === "Enter") e.preventDefault(); });
+document.getElementById("guess").addEventListener("keydown", e => { if (e.key === "Enter") e.preventDefault(); });
+document.getElementById("prev").onclick = () => { viewM--; if (viewM < 0) { viewM = 11; viewY--; } renderCalendar(); };
+document.getElementById("next").onclick = () => { viewM++; if (viewM > 11) { viewM = 0; viewY++; } renderCalendar(); };
+document.getElementById("selYear").onchange = (e) => { viewY = parseInt(e.target.value, 10); renderCalendar(); };
+document.getElementById("selMonth").onchange = (e) => { viewM = parseInt(e.target.value, 10); renderCalendar(); };
+document.getElementById("todayBtn").onclick = () => { const d = new Date(); viewY = d.getFullYear(); viewM = d.getMonth(); renderCalendar(); };
+
+document.getElementById("pprev").onclick = () => { pM--; if (pM < 0) { pM = 11; pY--; } renderPicker(); };
+document.getElementById("pnext").onclick = () => { pM++; if (pM > 11) { pM = 0; pY++; } renderPicker(); };
+document.getElementById("pickerClose").onclick = closePicker;
+document.getElementById("picker").onclick = (e) => { if (e.target.id === "picker") closePicker(); };
+
+render();
+</script>
+</body>
+</html>
