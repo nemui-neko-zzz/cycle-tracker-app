@@ -35,6 +35,9 @@
   .wrap { max-width: 560px; margin: 0 auto; padding: 20px 16px 120px; }
 
   .apphead { display: flex; align-items: center; justify-content: space-between; }
+  .headbtns { display: flex; align-items: center; gap: 8px; }
+  .sync-btn { background: var(--chip); color: var(--muted); border: none; border-radius: 20px; padding: 9px 15px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .sync-btn.on { background: var(--accent); color: var(--accentText); }
   h1 { font-size: 20px; margin-bottom: 4px; }
   .reload-btn { display: grid; place-items: center; width: 40px; height: 40px; border: none; border-radius: 50%; background: var(--inner); color: var(--muted); cursor: pointer; flex-shrink: 0; transition: transform .45s cubic-bezier(.2,.8,.2,1), color .2s, background .2s; }
   .reload-btn:hover { color: var(--accent); }
@@ -157,12 +160,15 @@
 <div class="wrap">
   <div class="apphead">
     <h1>そろそろ</h1>
+    <div class="headbtns">
+    <button id="syncBtn" class="sync-btn" style="display:none">同期</button>
     <button id="reloadBtn" class="reload-btn" title="最新に更新" aria-label="最新に更新">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
         <path d="M21 3v6h-6"/>
       </svg>
     </button>
+    </div>
   </div>
   <div class="lead">やるたびに記録すると、周期を自動で予測します</div>
 
@@ -225,6 +231,11 @@
 
 <div class="toast" id="toast">記録しました</div>
 
+<!-- Firebase (同期用。オフライン時は読み込まれず、ローカルのみで動作) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 <script>
 const DAY = 86400000;
 
@@ -247,7 +258,11 @@ let viewY, viewM;
 let hiddenIds = new Set(); // カレンダーで非表示にしている習慣
 (function(){ const d = new Date(); viewY = d.getFullYear(); viewM = d.getMonth(); })();
 
-function save() { localStorage.setItem("cycle", JSON.stringify(state)); }
+function save() {
+  state.updatedAt = Date.now();
+  localStorage.setItem("cycle", JSON.stringify(state));
+  if (!applyingRemote) pushToCloud();
+}
 function startOfDay(ms) { const d = new Date(ms); d.setHours(0,0,0,0); return d.getTime(); }
 function todayMs() { return startOfDay(Date.now()); }
 function fmtDate(ms) { const d = new Date(ms); return (d.getMonth()+1) + "/" + d.getDate(); }
@@ -793,6 +808,100 @@ document.getElementById("pickerClose").onclick = closePicker;
 document.getElementById("picker").onclick = (e) => { if (e.target.id === "picker") closePicker(); };
 
 render();
+
+/* ===== クラウド同期 (Firebase + Googleログイン) ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyC6KM0ZiG4boea6h8KL7lGEnREC2Itm9oY",
+  authDomain: "cycle-tracker-app-77383.firebaseapp.com",
+  projectId: "cycle-tracker-app-77383",
+  storageBucket: "cycle-tracker-app-77383.firebasestorage.app",
+  messagingSenderId: "217290900134",
+  appId: "1:217290900134:web:2c6d1a37ca964e2749ea67"
+};
+
+let fbUser = null, fbDb = null, fbUnsub = null, applyingRemote = false;
+
+(function initSync() {
+  if (typeof firebase === "undefined") return; // SDK未読込(オフライン等)→ローカルのみ
+  try {
+    firebase.initializeApp(firebaseConfig);
+    fbDb = firebase.firestore();
+    firebase.auth().getRedirectResult().catch(() => {});
+    firebase.auth().onAuthStateChanged(onAuthChanged);
+  } catch (e) { console.warn("sync init failed", e); }
+  const btn = document.getElementById("syncBtn");
+  btn.style.display = "inline-block";
+  btn.onclick = onSyncClick;
+  renderSyncUI();
+})();
+
+function dataDoc() {
+  return fbDb.collection("users").doc(fbUser.uid).collection("apps").doc("cycle-tracker");
+}
+
+function onAuthChanged(user) {
+  fbUser = user;
+  renderSyncUI();
+  if (fbUnsub) { fbUnsub(); fbUnsub = null; }
+  if (user) startSync();
+}
+
+function startSync() {
+  dataDoc().get().then(snap => {
+    const remote = snap.exists ? snap.data() : null;
+    const localAt = state.updatedAt || 0;
+    const remoteAt = remote ? (remote.updatedAt || 0) : -1;
+    if (remote && remoteAt >= localAt) applyRemote(remote);
+    else pushToCloud(); // ローカルが新しい/リモート無し → 上げる
+    fbUnsub = dataDoc().onSnapshot(s => {
+      if (!s.exists) return;
+      const r = s.data();
+      if ((r.updatedAt || 0) > (state.updatedAt || 0)) applyRemote(r);
+    });
+  }).catch(e => { console.warn(e); showToast("同期の読み込みに失敗"); });
+}
+
+function applyRemote(r) {
+  applyingRemote = true;
+  const at = r.updatedAt || Date.now();
+  state = normalize(r);
+  state.updatedAt = at;
+  localStorage.setItem("cycle", JSON.stringify(state));
+  render();
+  applyingRemote = false;
+  showToast("同期で最新になりました");
+}
+
+function pushToCloud() {
+  if (!fbUser || !fbDb) return;
+  try { dataDoc().set(JSON.parse(JSON.stringify(state))); }
+  catch (e) { console.warn("push failed", e); }
+}
+
+function renderSyncUI() {
+  const btn = document.getElementById("syncBtn");
+  if (!btn) return;
+  if (fbUser) { btn.textContent = "同期中"; btn.classList.add("on"); btn.title = (fbUser.email || "") + " / タップでログアウト"; }
+  else { btn.textContent = "同期"; btn.classList.remove("on"); btn.title = "Googleでログインして同期"; }
+}
+
+function onSyncClick() {
+  if (typeof firebase === "undefined") { showToast("同期にはネット接続が必要です"); return; }
+  if (fbUser) {
+    if (confirm("同期をオフにしますか？（ログアウト）\n記録はこの端末に残ります")) firebase.auth().signOut();
+    return;
+  }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  firebase.auth().signInWithPopup(provider).catch(err => {
+    const code = err && err.code;
+    if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/operation-not-supported-in-this-environment" || code === "auth/popup-closed-by-user") {
+      firebase.auth().signInWithRedirect(provider);
+    } else {
+      console.warn(err);
+      showToast("ログインできませんでした");
+    }
+  });
+}
 </script>
 </body>
 </html>
