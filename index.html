@@ -35,8 +35,8 @@
   .wrap { max-width: 560px; margin: 0 auto; padding: 20px 16px 120px; }
 
   .apphead { display: flex; align-items: center; justify-content: space-between; }
-  .headbtns { display: flex; align-items: center; gap: 8px; }
-  .sync-btn { background: var(--chip); color: var(--muted); border: none; border-radius: 20px; padding: 9px 15px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .headbtns { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .sync-btn { background: var(--chip); color: var(--muted); border: none; border-radius: 20px; padding: 9px 15px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; flex-shrink: 0; min-width: 76px; }
   .sync-btn.on { background: var(--accent); color: var(--accentText); }
   h1 { font-size: 20px; margin-bottom: 4px; }
   .reload-btn { display: grid; place-items: center; width: 40px; height: 40px; border: none; border-radius: 50%; background: var(--inner); color: var(--muted); cursor: pointer; flex-shrink: 0; transition: transform .45s cubic-bezier(.2,.8,.2,1), color .2s, background .2s; }
@@ -110,6 +110,14 @@
   .pcell.logged { background: var(--accent); color: var(--accentText); font-weight: 800; }
   .pcell.today { box-shadow: inset 0 0 0 2px var(--accent); }
   .picker-close { margin-top: 14px; width: 100%; background: var(--chip); color: var(--text); border: none; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+
+  /* 名前の編集ダイアログ */
+  .dlg-label { display: block; font-size: 12px; color: var(--muted); margin: 12px 2px 6px; }
+  .dlg-input { width: 100%; background: var(--inner); border: none; border-radius: 12px; padding: 14px; color: var(--text); font-size: 16px; }
+  .dlg-actions { display: flex; gap: 8px; margin-top: 18px; }
+  .dlg-actions button { flex: 1; border: none; border-radius: 12px; padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .dlg-cancel { background: var(--chip); color: var(--muted); }
+  .dlg-save { background: var(--accent); color: var(--accentText); }
   .daymenu-row { display: flex; align-items: center; gap: 10px; background: var(--inner); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
   .daymenu-row .cdot { width: 13px; height: 13px; box-sizing: border-box; }
   .dminfo { flex: 1; }
@@ -154,6 +162,7 @@
 
   .toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%) translateY(100px); background: var(--text); color: #fff; padding: 14px 24px; border-radius: 30px; font-weight: 700; font-size: 15px; box-shadow: 0 8px 24px rgba(0,0,0,.3); opacity: 0; transition: all .4s cubic-bezier(.2,.8,.2,1); z-index: 50; pointer-events: none; }
   .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .toast { width: max-content; max-width: min(90vw, 420px); text-align: center; z-index: 200; } /* 長い言葉も窮屈に折り返さない */
 </style>
 </head>
 <body>
@@ -728,16 +737,39 @@ function openDayMenu(dayMs, entries) {
   document.body.appendChild(ov);
 }
 
+// 鉛筆から: 習慣の名前を編集する専用ダイアログ
 function renameTask(id) {
   const t = state.tasks.find(x => x.id === id);
   if (!t) return;
-  const v = prompt("習慣の名前を変更", t.name);
-  if (v === null) return; // キャンセル
-  const name = v.trim();
-  if (!name) { showToast("名前が空です"); return; }
-  t.name = name;
-  save(); render();
-  showToast("名前を変えました");
+  const ov = document.createElement("div");
+  ov.className = "picker-overlay";
+  const box = document.createElement("div");
+  box.className = "picker";
+  box.innerHTML =
+    '<div class="picker-title"><b>習慣を編集</b></div>' +
+    '<label class="dlg-label">名前</label>' +
+    '<input class="dlg-input" id="renameInput" type="text" maxlength="40">' +
+    '<div class="dlg-actions">' +
+      '<button class="dlg-cancel" id="renameCancel">キャンセル</button>' +
+      '<button class="dlg-save" id="renameSave">保存</button>' +
+    '</div>';
+  ov.appendChild(box);
+  document.body.appendChild(ov);
+  const input = box.querySelector("#renameInput");
+  input.value = t.name;
+  input.focus(); input.select();
+
+  const close = () => ov.remove();
+  box.querySelector("#renameCancel").onclick = close;
+  ov.onclick = (e) => { if (e.target === ov) close(); };
+  box.querySelector("#renameSave").onclick = () => {
+    const name = input.value.trim();
+    if (!name) { showToast("名前が空です"); return; }
+    t.name = name;
+    save(); render();
+    close();
+    showToast("名前を変えました");
+  };
 }
 
 function removeTask(id, name) {
