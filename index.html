@@ -582,8 +582,8 @@ function openPicker(id) {
   const t = state.tasks.find(x => x.id === id);
   if (!t) return;
   pickerTaskId = id;
-  // 直近の記録がある月、なければ今月から始める
-  const base = t.logs.length ? new Date(Math.max(...t.logs)) : new Date();
+  // 過去の記録を追加するときも、毎回今月から表示する
+  const base = new Date();
   pY = base.getFullYear(); pM = base.getMonth();
   document.getElementById("pickerTitle").innerHTML = "<b>" + esc(t.name) + "</b> をやった日を選ぶ";
   document.getElementById("picker").style.display = "grid";
